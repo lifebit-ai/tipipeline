@@ -1,0 +1,41 @@
+---
+title: "Clustering report"
+date: "`r Sys.Date()`"
+output: html_document
+params:
+  input: ""
+  markers: ""
+  variables: ""
+---
+
+```{r setup, include=FALSE,echo=F, message=FALSE}
+library(Seurat)
+# format for variables "varnames1=values1,varnames2=values2,..."
+variables <- strsplit(params$variables,",")[[1]]
+if(length(variables)>0){
+  lvar <- list()
+  for(i in 1:length(variables)){
+    lvar[strsplit(variables[i],"=")[[1]][1]] <- as.numeric(strsplit(variables[i],"=")[[1]][2])
+  }
+}else{
+  lvar <- list(maxdims = 25,resolution = 0.8)
+}
+
+
+markers <- strsplit(params$markers,",")[[1]]
+norm.counts <- readRDS(params$input)
+seurat.counts <- CreateSeuratObject(counts = norm.counts)
+seurat.counts <- FindVariableFeatures(object = seurat.counts) # runs by default 2000 features on vst method
+seurat.counts <- ScaleData(object = seurat.counts)  # default scales all features
+seurat.counts <- RunPCA(object = seurat.counts) # default calculation of 50 PCs, should require no parameters
+seurat.counts <- FindNeighbors(object = seurat.counts, reduction = "pca", dims = 1:lvar$maxdims) # default on dimension reduction of pca with 1:10 dimensions (we need to decide how many pcs)
+seurat.counts <- FindClusters(object = seurat.counts, resolution = lvar$resolution) 
+seurat.counts <- RunUMAP(object = seurat.counts, dims=1:lvar$maxdims)
+
+saveRDS(seurat.counts@meta.data$seurat_clusters, "seurat_cluster.rds")
+```
+
+```{r umap, echo=F,message=F,fig.align= 'center',fig.height=10,fig.width=18}
+DimPlot(object = seurat.counts, reduction = "umap", do.label=T,label.size=8)
+FeaturePlot(seurat.counts, features = markers)
+```

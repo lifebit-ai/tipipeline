@@ -1,0 +1,169 @@
+---
+title: "QC report"
+date: "`r Sys.Date()`"
+output: html_document
+params:
+  input: ''
+---
+
+```{r setup, include=FALSE,echo=F, message=FALSE}
+cleanEmptyDrops <- function(countMatrix){
+  e.out <- DropletUtils::emptyDrops(counts(countMatrix))
+  is.cell <- e.out$FDR <= 0.01
+  countMatrix <- countMatrix[,which(is.cell==T)]
+  countsGene <- Matrix::rowSums(counts(countMatrix), na.rm = FALSE, dims = 1)
+  countMatrix <- countMatrix[which(countsGene !=0),]
+  return(countMatrix)
+}
+
+library("ggplot2")
+library("scater")
+library("DropletUtils")
+sce <- readRDS(params$input)
+
+bcrank <- barcodeRanks(counts(sce))
+# Only showing unique points for plotting speed.
+uniq <- !duplicated(bcrank$rank)
+bcrank.plot <- as.data.frame(bcrank[uniq,]@listData)
+#saveRDS(counts.filtered,file="filtered.rds")
+sce <- cleanEmptyDrops(sce) 
+saveRDS(sce, "filtered.rds")
+
+is.mito <- grepl("^MT-", rownames(sce), ignore.case = TRUE)
+sce <- calculateQCMetrics(sce, feature_controls=list(Mt=is.mito))
+
+out.mito <- isOutlier(sce$pct_counts_Mt, nmads=3, type="higher")
+out.ngene <- isOutlier(sce$total_features_by_counts, nmads=3, type="both")
+out.numi <- isOutlier(sce$total_counts, nmads=3, type="both")
+
+metaData<-data.frame("Experiment"=colData(sce)$Barcode,
+                     "nGene"=sce$total_features_by_counts,
+                     "nUMI"=sce$total_counts,
+                     "percent.mito"=sce$pct_counts_Mt,
+                     "out.mito"=out.mito,
+                     "out.ngene"=out.ngene,
+                     "out.numi"=out.numi,
+                     stringsAsFactors = F)
+
+keep <- !(out.ngene | out.numi | out.mito)
+sce$PassQC <- keep
+sce <- sce[,keep]
+saveRDS(sce, "filtered.rds")
+
+metaData$Experiment <- 1 # needed for the violinplot
+ul.mito <- median(metaData$percent.mito)+3*mad(metaData$percent.mito,na.rm = TRUE)
+ll.cd <- median(metaData$nUMI)-3*mad(metaData$nUMI,na.rm = TRUE)
+ul.cd <- median(metaData$nUMI)+3*mad(metaData$nUMI,na.rm = TRUE)
+ll.ng <- median(metaData$nGene)-3*mad(metaData$nGene,na.rm = TRUE)
+ul.ng <- median(metaData$nGene)+3*mad(metaData$nGene,na.rm = TRUE)
+```
+
+## visualizing inflection point
+```{r, echo=F}
+ggplot(bcrank.plot,aes(rank,total)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  xlab("barcode rank") +
+  ylab("count depth (total UMI count)") +
+  theme_bw() +
+  geom_hline(yintercept=metadata(bcrank)$inflection, linetype="dashed", 
+             color = "darkgreen", size=1) +
+  geom_hline(yintercept=metadata(bcrank)$knee, linetype="dashed", 
+             color = "dodgerblue", size=1)
+```
+
+## Post filtering QC analysis
+```{r, echo=F}
+ggplot(metaData, aes(x = Experiment, y = nUMI)) + 
+  geom_violin(fill="gray80") + 
+  geom_jitter(height = 0, width = 0.3,size=0.5) +
+  geom_hline(yintercept=ul.cd, 
+             color = "red", size=1) +
+  geom_hline(yintercept=ll.cd, 
+             color = "red", size=1) +
+  ylab("Count depth (total UMI count)") +
+  theme_bw() # violinplot of count depth
+
+ggplot(metaData, aes(x = nUMI)) + 
+  geom_histogram(binwidth=100) +
+  xlab("Count depth (total UMI count)") +
+  ylab("Frequency") +
+  geom_vline(xintercept=ul.cd, 
+             color = "red", size=1) +
+  geom_vline(xintercept=ll.cd, 
+             color = "red", size=1) +
+  theme_bw() # histogram of count depth
+
+ggplot(metaData, aes(x = nGene)) + 
+  geom_histogram(binwidth=20) +
+  xlab("Number of Genes") +
+  ylab("Frequency") +
+  geom_vline(xintercept=ul.ng, 
+             color = "red", size=1) +
+  geom_vline(xintercept=ll.ng, 
+             color = "red", size=1) +
+  theme_bw() # histogram of nr of genes
+
+ggplot(metaData, aes(x = Experiment, y = nGene)) + 
+  geom_violin(fill="gray80") + 
+  geom_jitter(height = 0, width = 0.3,size=0.5) +
+  geom_hline(yintercept=ul.ng, 
+             color = "red", size=1) +
+  geom_hline(yintercept=ll.ng, 
+             color = "red", size=1) +
+  ylab("Nr of Genes") +
+  theme_bw() # violinplot of nr of genes
+
+
+ggplot(metaData, aes(x = percent.mito)) + 
+  geom_histogram(binwidth=0.1) +
+  xlab("% Mitochondrial counts") +
+  ylab("Frequency") +
+  geom_vline(xintercept=ul.mito, 
+             color = "red", size=1) +
+  theme_bw() # histogram of % mito
+
+ggplot(metaData, aes(x = Experiment, y = percent.mito)) + 
+  geom_violin(fill="gray80") + 
+  geom_jitter(height = 0, width = 0.3,size=0.5) +
+  geom_hline(yintercept=ul.mito, 
+             color = "red", size=1) +
+  ylab("% Mitochondrial counts") +
+  theme_bw() # violinplot of % mito
+
+ggplot(metaData, aes(x = nUMI,y=nGene,colour=percent.mito)) + 
+  geom_point(size=0.5) +
+  scale_color_gradient2(midpoint=ul.mito, low="black", mid="white",
+                        high="red", space ="Lab" )+
+  xlab("Count depth (total UMI count)") +
+  ylab("Nr of Genes") +
+  geom_vline(xintercept=ul.cd, 
+             color = "red", size=1) +
+  geom_vline(xintercept=ll.cd, 
+             color = "red", size=1) +
+  geom_hline(yintercept=ul.ng, 
+             color = "red", size=1) +
+  geom_hline(yintercept=ll.ng, 
+             color = "red", size=1) +
+  geom_rug(col=rgb(0,0,0.5,alpha=.1)) +
+  theme_bw()
+
+ggplot(metaData, aes(x = nUMI,y=nGene,colour=out.mito)) + 
+  geom_point(size=0.5) +
+  scale_color_manual(values=c("#00bfc4", "#F8766D")) +
+  xlab("Count depth (total UMI count)") +
+  ylab("Nr of Genes") +
+  geom_vline(xintercept=ul.cd, 
+             color = "red", size=1) +
+  geom_vline(xintercept=ll.cd, 
+             color = "red", size=1) +
+  geom_hline(yintercept=ul.ng, 
+             color = "red", size=1) +
+  geom_hline(yintercept=ll.ng, 
+             color = "red", size=1) +
+  geom_rug(col=rgb(0,0,0.5,alpha=.1)) +
+  theme_bw()
+  
+```
+

@@ -4,7 +4,7 @@ nextflow.preview.dsl=2
 params.out_dir = ""
 params.part=1
 // Input path parameters Part 1
-params.counts = """ // specify a path to a raw count matrix from cellranger 3.0
+params.counts = "" // specify a path to a raw count matrix from cellranger 3.0
 params.list_markers = "" // e.g : "MS4A1,GNLY,CD3E,CD14,FCER1A,FCGR3A,LYZ,PPBP,CD8A"
 // Part 2
 params.clusters="" // e.g : "1,7,9"

@@ -44,7 +44,7 @@ process pre_processing {
 process filtering_qc_r {
   label "r"
   container "qrouchon/r-scrnaseq-fqc"
-  publishDir "${params.out_dir}", mode: 'move', pattern: 'qc_report.html'
+  publishDir "${params.out_dir}", mode: 'copy', pattern: 'qc_report.html'
   input:
   file script
   file rawMat
@@ -78,7 +78,7 @@ process norm_r {
 process clustering_r {
   label "r"
   container "qrouchon/r-norm-seurat"
-  publishDir "${params.out_dir}", mode: 'move', pattern: 'umap.html'
+  publishDir "${params.out_dir}", mode: 'copy', pattern: 'umap.html'
   input:
   file script
   file nmat
@@ -98,7 +98,7 @@ process clustering_r {
 process save_part1 {
   label "r"
   container "qrouchon/r-norm-seurat"
-  publishDir "${params.out_dir}", mode: 'move'
+  publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
   file filtered
@@ -181,7 +181,7 @@ process slingshot {
 process dynplot {
   label "r"
   container "qrouchon/r-dynverse-lite"
-  publishDir "${params.out_dir}", mode: 'move'
+  publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
   file rh5p

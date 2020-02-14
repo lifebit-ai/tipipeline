@@ -28,7 +28,6 @@ params.dynverse_script = "${baseDir}/scripts/final_report.Rmd"
 //#######################
 process pre_processing {
   label "r"
-  container "qrouchon/r-scrnaseq-fqc"
   //publishDir "$outDir", mode: 'copy'
   input:
   file script
@@ -43,7 +42,6 @@ process pre_processing {
 
 process filtering_qc_r {
   label "r"
-  container "qrouchon/r-scrnaseq-fqc"
   publishDir "${params.out_dir}", mode: 'copy', pattern: 'qc_report.html'
   input:
   file script
@@ -62,7 +60,6 @@ process filtering_qc_r {
 
 process norm_r {
   label "r"
-  container "qrouchon/r-norm"
   //publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
@@ -77,7 +74,6 @@ process norm_r {
 
 process clustering_r {
   label "r"
-  container "qrouchon/r-norm-seurat"
   publishDir "${params.out_dir}", mode: 'copy', pattern: 'umap.html'
   input:
   file script
@@ -97,7 +93,6 @@ process clustering_r {
 
 process save_part1 {
   label "r"
-  container "qrouchon/r-norm-seurat"
   publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
@@ -114,7 +109,6 @@ process save_part1 {
 
 process select_cluster {
   label "r"
-  container "qrouchon/r-scrnaseq-fqc"
   //publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
@@ -131,7 +125,6 @@ process select_cluster {
 
 process dimred_wrap_expression {
   label "r"
-  container "qrouchon/r-dynverse-lite"
   //publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
@@ -148,7 +141,6 @@ process dimred_wrap_expression {
 process paga {
   echo
   label "r"
-  container "dynverse/ti_paga"
   //publishDir "${params.out_dir}", mode: 'copy'
   input:
   file fh5
@@ -164,7 +156,6 @@ process paga {
 
 process slingshot {
   label "r"
-  container "dynverse/ti_slingshot"
   //publishDir "${params.out_dir}", mode: 'copy'
   input:
   file fh5
@@ -180,7 +171,6 @@ process slingshot {
 
 process dynplot {
   label "r"
-  container "qrouchon/r-dynverse-lite"
   publishDir "${params.out_dir}", mode: 'copy'
   input:
   file script
@@ -209,6 +199,7 @@ log.info """\
          """
          .stripIndent()
 
+workflow {
 
 if ( params.part == 1 ) {
 
@@ -238,4 +229,5 @@ if ( params.part == 1 ) {
 
 } else {
   error "you should choose a pipeline part to run (1 or 2)"
+}
 }
